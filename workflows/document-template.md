@@ -8,7 +8,7 @@ The bold passes (`Intuitively.`, `Technically.`) are required leads. A
 section may omit the Figure (only if no figure genuinely clarifies); it may
 not omit the other three parts.
 
-```markdown
+````markdown
 # <Project / Session Title>
 
 ## TL;DR
@@ -108,7 +108,7 @@ chart = xy.line_chart(
 )
 chart.to_png("figures/fig-01-<slug>.png")
 ```
-```
+````
 
 ## Filling notes
 

@@ -103,12 +103,12 @@ For architecture / data flow / state, write a Mermaid block directly in the
 Markdown (the renderer — if the write-up is later rendered to HTML —
 handles it; in raw Markdown it is still legible):
 
-```markdown
+````markdown
 ```mermaid
 flowchart LR
   A[Ingest] --> B[Transform] --> C[Store]
 ```
-```
+````
 
 Give it a takeaway caption in the prose immediately before or after.
 Do not emit a Mermaid PNG — the block is the figure.
