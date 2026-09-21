@@ -1,23 +1,38 @@
 #!/usr/bin/env python3
-"""md2html-free audit gate for technical-session-writeup documents.
+"""Audit gate for technical-session-writeup documents.
 
-Stdlib only. Python >= 3.8. Exits 0 when the write-up is clean, 1 with
-line-numbered findings otherwise.
+Stdlib only. Python >= 3.8.
 
-Checks (mechanically verifiable subset of the skill's self-audit):
-  1. Structure  - required H2 sections present, in order; exactly one H1.
-  2. Template   - every technical section has Why-this-matters,
-                  Intuitively, Technically passes, in order.
-  3. Figures    - every referenced image file exists on disk.
-  4. Corrections- no narration-of-correction phrases in the main body
-                  (everything before Appendix A); code fences excluded.
-  5. Appendices - A has entries or "None."; B has entries or "None.";
-                  C has a code fence when figures exist.
+Findings are split into two tiers:
+  hard      - defects that block delivery (exit 1)
+  advisory  - judgment-adjacent nudges (printed, exit 0)
+
+Hard checks (mechanically verifiable subset of the skill's self-audit):
+  1. Structure   - required H2 sections present, in order; exactly one H1.
+  2. Template    - every technical section has Why-this-matters,
+                   Intuitively, Technically passes, in order.
+  3. Figures     - every referenced image file exists on disk.
+  4. Corrections - no narration-of-correction phrases in the main body
+                   (everything before Appendix A); code fences excluded.
+  5. Appendices  - A has entries or "None."; B has entries or "None.";
+                   C has a code fence when figures exist.
+
+Advisories (warn, do not block):
+  - a technical section has no Figure (the skill permits omission, but it
+    is worth a second look)
+  - a "Why this matters" opener shorter than 25 characters
+  - an image with empty alt text
 
 Usage:
-  python3 audit_writeup.py <writeup.md>
+  python3 audit_writeup.py [--json] <writeup.md>
+
+With --json, prints:
+  {"file": ..., "clean": bool,
+   "hard": [[line, msg], ...], "advisories": [[line, msg], ...]}
 """
 
+import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -82,18 +97,23 @@ CODE_FENCE = re.compile(r"^(```|~~~)")
 H1 = re.compile(r"^#\s+")
 H2 = re.compile(r"^##\s+(.*)$")
 IMG = re.compile(r"!\[[^\]]*\]\(([^)\s]+)(?:\s+[^\)]*)?\)")
+IMG_ALT = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)")
 GLOSSARY_ENTRY = re.compile(r"^\s*(?:[-*]\s+)?\*\*[^*]+\.\*\*", re.MULTILINE)
 APPENDIX_A_ENTRY = re.compile(r"^###\s+A\.\d+", re.MULTILINE)
 
 
 def strip_code_fences(lines):
-    """Return (lines_with_fences_masked, fence_line_numbers)."""
+    """Return lines with code-fence contents blanked out.
+
+    Fence delimiters themselves are blanked too; they are neutral for
+    heading detection and phrase scanning.
+    """
     masked = []
     in_fence = False
     for ln in lines:
         if CODE_FENCE.match(ln.strip()):
             in_fence = not in_fence
-            masked.append("")  # fence delimiter itself is neutral
+            masked.append("")
             continue
         masked.append("" if in_fence else ln)
     return masked
@@ -120,7 +140,10 @@ def section_bounds(lines, start):
 
 
 def check(md_path: Path):
-    findings = []
+    """Return (hard_findings, advisory_findings); each is a list of
+    (line_number, message) tuples."""
+    hard = []
+    adv = []
     text = md_path.read_text(encoding="utf-8")
     lines = text.splitlines()
     masked = strip_code_fences(lines)
@@ -128,7 +151,7 @@ def check(md_path: Path):
     # 1. Exactly one H1 (fence-masked so comment lines in code do not count).
     h1s = [i for i, ln in enumerate(masked) if H1.match(ln)]
     if len(h1s) != 1:
-        findings.append(
+        hard.append(
             (h1s[0] if h1s else 0, f"expected exactly one H1 title, found {len(h1s)}")
         )
 
@@ -137,9 +160,9 @@ def check(md_path: Path):
     for title in REQUIRED_SECTIONS:
         pos = find_h2(masked, title)
         if pos is None:
-            findings.append((idx + 1, f"missing required section: ## {title}"))
+            hard.append((idx + 1, f"missing required section: ## {title}"))
         elif pos < idx:
-            findings.append((pos + 1, f"section out of order: ## {title}"))
+            hard.append((pos + 1, f"section out of order: ## {title}"))
         else:
             idx = pos
 
@@ -150,7 +173,7 @@ def check(md_path: Path):
         if m and SECTION_RE.match(ln):
             tech.append((i, section_bounds(masked, i)))
     if not tech:
-        findings.append((1, "no technical sections found (## Section N: ...)"))
+        hard.append((1, "no technical sections found (## Section N: ...)"))
     for start, end in tech:
         title = lines[start].strip()
         body = "\n".join(masked[start:end])
@@ -158,13 +181,20 @@ def check(md_path: Path):
         intu = re.search(r"\*\*Intuitively\.\*\*|\*\*Intuitively:", body, re.IGNORECASE)
         techp = re.search(r"\*\*Technically\.\*\*|\*\*Technically:", body, re.IGNORECASE)
         if not why:
-            findings.append((start + 1, f"section '{title}' missing 'Why this matters'"))
+            hard.append((start + 1, f"section '{title}' missing 'Why this matters'"))
         if not intu:
-            findings.append((start + 1, f"section '{title}' missing **Intuitively.** pass"))
+            hard.append((start + 1, f"section '{title}' missing **Intuitively.** pass"))
         if not techp:
-            findings.append((start + 1, f"section '{title}' missing **Technically.** pass"))
+            hard.append((start + 1, f"section '{title}' missing **Technically.** pass"))
         if why and intu and techp and not (why.start() < intu.start() < techp.start()):
-            findings.append((start + 1, f"section '{title}' parts out of order (Why -> Intuitively -> Technically)"))
+            hard.append((start + 1, f"section '{title}' parts out of order (Why -> Intuitively -> Technically)"))
+        # Advisories: short opener, missing figure.
+        if why and intu and why.start() < intu.start():
+            opener = body[why.end():intu.start()].strip()
+            if len(opener) < 25:
+                adv.append((start + 1, f"section '{title}' 'Why this matters' opener is short (< 25 chars)"))
+        if "!" not in body and "mermaid" not in body.lower():
+            adv.append((start + 1, f"section '{title}' has no Figure (permitted - verify it adds nothing)"))
 
     # 4. Figures exist on disk (references inside code fences are literals, skipped).
     for i, ln in enumerate(masked):
@@ -174,7 +204,10 @@ def check(md_path: Path):
                 continue
             rel = Path(src.split("?")[0])
             if not (md_path.parent / rel).exists():
-                findings.append((i + 1, f"figure file missing: {src}"))
+                hard.append((i + 1, f"figure file missing: {src}"))
+        for m in IMG_ALT.finditer(ln):
+            if m.group(1).strip() == "":
+                adv.append((i + 1, f"image has empty alt text: ({m.group(2)[:40]})"))
 
     # 5. Corrections rule: main body only (before Appendix A).
     app_a = find_h2(masked, "Appendix A: Corrections and Dead Ends")
@@ -184,7 +217,7 @@ def check(md_path: Path):
             continue
         for pat in CORRECTION_PHRASES:
             if re.search(pat, ln, re.IGNORECASE):
-                findings.append((i + 1, f"correction narration in main body: {ln.strip()[:70]}"))
+                hard.append((i + 1, f"correction narration in main body: {ln.strip()[:70]}"))
                 break  # one finding per line
 
     # 6. Appendix content rules.
@@ -198,7 +231,7 @@ def check(md_path: Path):
         end = section_bounds(masked, pos)
         seg = "\n".join(lines[pos:end])
         if "None." not in seg and not entry_re.search(seg):
-            findings.append((pos + 1, f"{title}: must contain entries or 'None.'"))
+            hard.append((pos + 1, f"{title}: must contain entries or 'None.'"))
 
     pos_c = find_h2(masked, "Appendix C: Reproducing the Figures")
     if pos_c is not None:
@@ -206,27 +239,58 @@ def check(md_path: Path):
         seg = "\n".join(lines[pos_c:end])
         has_fig = any(IMG.search(ln) for ln in masked)
         if has_fig and "```" not in seg and "None." not in seg:
-            findings.append((pos_c + 1, "Appendix C: figures exist but no reproducible plotting script found"))
+            hard.append((pos_c + 1, "Appendix C: figures exist but no reproducible plotting script found"))
 
-    return findings
+    return hard, adv
 
 
 def main():
-    if len(sys.argv) != 2:
-        print(__doc__)
-        return 2
-    md = Path(sys.argv[1])
+    parser = argparse.ArgumentParser(
+        description="Audit a technical-session-writeup document."
+    )
+    parser.add_argument("writeup", help="path to the write-up Markdown file")
+    parser.add_argument(
+        "--json", action="store_true", help="emit machine-readable JSON"
+    )
+    args = parser.parse_args()
+
+    md = Path(args.writeup)
     if not md.exists():
-        print(f"audit: not found: {md}")
+        if args.json:
+            print(json.dumps({"file": str(md), "clean": False, "error": "not found"}))
+        else:
+            print(f"audit: not found: {md}")
         return 2
-    findings = check(md)
-    if findings:
-        print(f"audit: {len(findings)} finding(s) in {md.name}:")
-        for lineno, msg in sorted(findings):
+
+    hard, adv = check(md)
+    hard.sort()
+    adv.sort()
+
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "file": str(md),
+                    "clean": not hard,
+                    "hard": [[n, m] for n, m in hard],
+                    "advisories": [[n, m] for n, m in adv],
+                },
+                indent=2,
+            )
+        )
+        return 1 if hard else 0
+
+    if hard:
+        print(f"audit: {len(hard)} hard finding(s) in {md.name}:")
+        for lineno, msg in hard:
             print(f"  L{lineno}: {msg}")
-        return 1
-    print(f"audit: clean ({md.name})")
-    return 0
+    if adv:
+        print(f"audit: {len(adv)} advisory(ies) in {md.name} (review, non-blocking):")
+        for lineno, msg in adv:
+            print(f"  L{lineno}: {msg}")
+    if not hard:
+        print(f"audit: clean ({md.name})" if not adv else f"audit: clean with advisories ({md.name})")
+    return 1 if hard else 0
 
 
 if __name__ == "__main__":
