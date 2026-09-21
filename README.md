@@ -61,13 +61,24 @@ session", "document what we did". It produces:
 ## The audit gate
 
 ```bash
-python3 scripts/audit_writeup.py <writeup.md>
+python3 scripts/audit_writeup.py <writeup.md>          # human-readable
+python3 scripts/audit_writeup.py --json <writeup.md>   # machine-readable
 ```
 
-Mechanically verifies: required structure and order, per-section template
-(Why / Intuitively / Technically), figure files exist on disk, no
-correction-narration phrases in the main body, appendices populated. Exit 0
-= clean. The gate is necessary, not sufficient — the judgment checklist in
+Findings are split into two tiers:
+
+- **hard** — defects that block delivery (exit 1): structure and order,
+  per-section template (Why / Intuitively / Technically), figure files
+  missing on disk, correction-narration phrases in the main body, empty
+  appendices.
+- **advisory** — judgment-adjacent nudges (exit 0, printed for review):
+  a section with no figure, a short "Why this matters" opener, empty image
+  alt text.
+
+`--json` emits `{"file", "clean", "hard": [[line, msg], ...],
+"advisories": [[line, msg], ...]}` for harnesses to consume programmatically.
+
+The gate is necessary, not sufficient — the judgment checklist in
 `workflows/self-audit.md` (same-thing check, outsider test, rigor) still
 applies.
 

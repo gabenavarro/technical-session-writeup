@@ -8,9 +8,22 @@ pass.
 
 ```bash
 python3 <skill-dir>/scripts/audit_writeup.py <writeup.md>
+python3 <skill-dir>/scripts/audit_writeup.py --json <writeup.md>   # machine-readable
 ```
 
-Exit 0 with no findings is required. The gate checks:
+Findings have two tiers:
+
+- **hard** (block delivery; exit 1): structure, section template,
+  missing figure files, correction-narration phrases in the main body,
+  empty appendices.
+- **advisory** (exit 0; review, do not block): a section with no figure,
+  a short "Why this matters" opener, empty image alt text.
+
+Exit 0 with no hard findings is required. Advisories are prompts for the
+judgment checklist below, not defects. `--json` emits
+`{"file", "clean", "hard": [[line, msg], ...], "advisories": [...]}`.
+
+The gate checks, mechanically:
 
 - **Structure:** all required `##` headings present, in order.
 - **Section template:** every numbered technical section has a "Why this
@@ -64,11 +77,13 @@ reading:
 ## 3. Fix-and-re-run loop
 
 1. Run the gate.
-2. Fix every finding (relocate narration to Appendix A, add missing
+2. Fix every hard finding (relocate narration to Appendix A, add missing
    structure, create missing figure files, add glossary entries).
-3. Re-run the gate until clean.
-4. Work the judgment checklist.
-5. Deliver.
+3. Review advisories: a missing figure must be a deliberate omission, a
+   short opener must be rewritten.
+4. Re-run the gate until no hard findings remain.
+5. Work the judgment checklist.
+6. Deliver.
 
-A clean gate plus a checked checklist is the definition of done for this
-skill.
+A clean gate (no hard findings) plus a checked checklist is the definition
+of done for this skill.
