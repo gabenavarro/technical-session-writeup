@@ -61,8 +61,10 @@ session", "document what we did". It produces:
 ## The audit gate
 
 ```bash
-python3 scripts/audit_writeup.py <writeup.md>          # human-readable
+python3 scripts/audit_writeup.py <writeup.md>          # single file
+python3 scripts/audit_writeup.py <dir>                 # all *.md in a dir
 python3 scripts/audit_writeup.py --json <writeup.md>   # machine-readable
+python3 scripts/audit_writeup.py --version              # gate version (pin it)
 ```
 
 Findings are split into two tiers:

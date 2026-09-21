@@ -8,7 +8,9 @@ pass.
 
 ```bash
 python3 <skill-dir>/scripts/audit_writeup.py <writeup.md>
+python3 <skill-dir>/scripts/audit_writeup.py <dir>        # every *.md in a dir
 python3 <skill-dir>/scripts/audit_writeup.py --json <writeup.md>   # machine-readable
+python3 <skill-dir>/scripts/audit_writeup.py --version    # pin the gate version
 ```
 
 Findings have two tiers:

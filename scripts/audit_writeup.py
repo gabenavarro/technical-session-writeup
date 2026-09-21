@@ -24,11 +24,16 @@ Advisories (warn, do not block):
   - an image with empty alt text
 
 Usage:
-  python3 audit_writeup.py [--json] <writeup.md>
+  python3 audit_writeup.py [--json] <writeup.md | dir>
+  python3 audit_writeup.py --version
 
-With --json, prints:
+A path may be a single Markdown file or a directory; a directory audits
+every *.md in it (non-recursive, README files skipped).
+
+With --json, prints per file:
   {"file": ..., "clean": bool,
    "hard": [[line, msg], ...], "advisories": [[line, msg], ...]}
+For a directory, prints {"files": [ ... ], "clean": bool}.
 """
 
 import argparse
@@ -36,6 +41,8 @@ import json
 import re
 import sys
 from pathlib import Path
+
+__version__ = "1.1.0"
 
 # --- required H2 sections, in document order -------------------------------
 REQUIRED_SECTIONS = [
@@ -244,42 +251,30 @@ def check(md_path: Path):
     return hard, adv
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Audit a technical-session-writeup document."
-    )
-    parser.add_argument("writeup", help="path to the write-up Markdown file")
-    parser.add_argument(
-        "--json", action="store_true", help="emit machine-readable JSON"
-    )
-    args = parser.parse_args()
-
-    md = Path(args.writeup)
+def audit_one(md: Path):
+    """Audit a single file; return sorted (hard, adv) or None if missing."""
     if not md.exists():
-        if args.json:
-            print(json.dumps({"file": str(md), "clean": False, "error": "not found"}))
-        else:
-            print(f"audit: not found: {md}")
-        return 2
-
+        return None
     hard, adv = check(md)
     hard.sort()
     adv.sort()
+    return hard, adv
 
-    if args.json:
-        print(
-            json.dumps(
-                {
-                    "file": str(md),
-                    "clean": not hard,
-                    "hard": [[n, m] for n, m in hard],
-                    "advisories": [[n, m] for n, m in adv],
-                },
-                indent=2,
-            )
-        )
-        return 1 if hard else 0
 
+def collect_targets(target: Path):
+    """Resolve a target to a list of Markdown files to audit.
+
+    A file is returned as-is; a directory yields its *.md files,
+    non-recursive, skipping README files (orientation, not write-ups).
+    """
+    if target.is_file():
+        return [target]
+    if target.is_dir():
+        return sorted(p for p in target.glob("*.md") if p.name != "README.md")
+    return []
+
+
+def print_human(md: Path, hard, adv):
     if hard:
         print(f"audit: {len(hard)} hard finding(s) in {md.name}:")
         for lineno, msg in hard:
@@ -290,7 +285,97 @@ def main():
             print(f"  L{lineno}: {msg}")
     if not hard:
         print(f"audit: clean ({md.name})" if not adv else f"audit: clean with advisories ({md.name})")
-    return 1 if hard else 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Audit technical-session-writeup documents."
+    )
+    parser.add_argument(
+        "target",
+        nargs="?",
+        help="a write-up Markdown file, or a directory of *.md files "
+        "(non-recursive, README files skipped)",
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="emit machine-readable JSON"
+    )
+    parser.add_argument(
+        "--version", action="store_true", help="print gate version and exit"
+    )
+    args = parser.parse_args()
+
+    if args.version:
+        print(__version__)
+        return 0
+    if args.target is None:
+        parser.error("target is required unless --version is given")
+
+    target = Path(args.target)
+    files = collect_targets(target)
+    if not files:
+        if args.json:
+            print(
+                json.dumps(
+                    {"file": str(target), "clean": False, "error": "not found"}
+                )
+            )
+        else:
+            print(f"audit: not found: {target}")
+        return 2
+
+    results = []
+    for f in files:
+        r = audit_one(f)
+        if r is None:
+            if args.json:
+                print(
+                    json.dumps(
+                        {"file": str(f), "clean": False, "error": "not found"}
+                    )
+                )
+            else:
+                print(f"audit: not found: {f}")
+            return 2
+        results.append((f, r[0], r[1]))
+
+    is_dir = target.is_dir()
+    all_hard = sum(len(hard) for _, hard, _ in results)
+
+    if args.json:
+        if is_dir:
+            payload = {
+                "files": [
+                    {
+                        "file": str(f),
+                        "clean": not hard,
+                        "hard": [[n, m] for n, m in hard],
+                        "advisories": [[n, m] for n, m in adv],
+                    }
+                    for f, hard, adv in results
+                ],
+                "clean": all_hard == 0,
+            }
+        else:
+            f, hard, adv = results[0]
+            payload = {
+                "file": str(f),
+                "clean": not hard,
+                "hard": [[n, m] for n, m in hard],
+                "advisories": [[n, m] for n, m in adv],
+            }
+        print(json.dumps(payload, indent=2))
+        return 1 if all_hard else 0
+
+    if is_dir:
+        for f, hard, adv in results:
+            print_human(f, hard, adv)
+            print()
+        print(f"audit: {all_hard} hard finding(s) across {len(results)} file(s)")
+    else:
+        f, hard, adv = results[0]
+        print_human(f, hard, adv)
+    return 1 if all_hard else 0
 
 
 if __name__ == "__main__":
