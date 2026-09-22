@@ -12,8 +12,8 @@ Hard checks (mechanically verifiable subset of the skill's self-audit):
   2. Template    - every technical section has Why-this-matters,
                    Intuitively, Technically passes, in order.
   3. Figures     - every technical section has at least one figure
-                   (image reference or Mermaid block); every referenced
-                   image file exists on disk.
+                   (image reference, Mermaid block, or fig/xy/svg code
+                   fence); every referenced image file exists on disk.
   4. Corrections - no narration-of-correction phrases in the main body
                    (everything before Appendix A); code fences excluded.
   5. Appendices  - A has entries or "None."; B has entries or "None.";
@@ -44,7 +44,7 @@ import re
 import sys
 from pathlib import Path
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 # --- required H2 sections, in document order -------------------------------
 REQUIRED_SECTIONS = [
@@ -203,17 +203,19 @@ def check(md_path: Path):
         if why and intu and techp and not (why.start() < intu.start() < techp.start()):
             hard.append((start + 1, f"section '{title}' parts out of order (Why -> Intuitively -> Technically)"))
         # Hard: every technical section must carry at least one figure
-        # (an image reference or a Mermaid block). The skill's policy is
-        # that more figures is better than fewer, so a section with zero is
-        # a defect, not a permitted omission.
+        # (an image reference, a Mermaid block, or a fig/xy/svg code fence).
+        # The skill's policy is that more figures is better than fewer, so a
+        # section with zero is a defect, not a permitted omission.
+        # (The masked text carries fence languages as [fence:...] markers.)
         figs = sum(1 for _ in IMG.finditer(body))
-        if figs == 0 and "mermaid" not in body.lower():
+        fig_fences = len(re.findall(r"\[fence:(fig|xy|svg|mermaid)\]", body))
+        if figs == 0 and fig_fences == 0:
             hard.append(
                 (start + 1, f"section '{title}' has no figure (add a diagram or plot)")
             )
         # Advisory: a section with exactly one figure could usually carry a
         # second (structure + result); nudge toward density.
-        elif figs == 1 and "mermaid" not in body.lower():
+        elif figs == 1 and fig_fences == 0:
             adv.append(
                 (start + 1, f"section '{title}' has one figure - consider a second (e.g. structure + result)")
             )
@@ -258,8 +260,8 @@ def check(md_path: Path):
     pos_c = find_h2(masked, "Appendix C: Reproducing the Figures")
     if pos_c is not None:
         end = section_bounds(masked, pos_c)
+        has_fig = any(IMG.search(ln) for ln in masked) or re.search(r"\[fence:(fig|xy|svg|mermaid)\]", "\n".join(masked))
         seg = "\n".join(lines[pos_c:end])
-        has_fig = any(IMG.search(ln) for ln in masked)
         if has_fig and "```" not in seg and "None." not in seg:
             hard.append((pos_c + 1, "Appendix C: figures exist but no reproducible plotting script found"))
 

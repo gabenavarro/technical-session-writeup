@@ -111,7 +111,7 @@ replacement for it.
 
 Label the passes with bold leads so the reader can scan by altitude:
 
-```markdown
+````markdown
 ## Section 2: <name>
 
 Why this matters: <2–4 sentences, specific>
@@ -120,9 +120,11 @@ Why this matters: <2–4 sentences, specific>
 
 **Technically.** <rigorous: formulas, versions, bounds, citations>
 
-![Fig N: <takeaway>](figures/fig-NN-<slug>.png)
-<caption sentence if the image alt text is not the full takeaway>
+```fig
+<self-contained matplotlib script; ends with save()>
 ```
+<Fig N: <takeaway>.>
+````
 
 ## The layering rule ("ELI5 for a genius")
 
@@ -185,37 +187,60 @@ re-run until clean.
 
 ## Figures and diagrams
 
-Generate figures with **XY** (`reflex-dev/xy`) — a Rust-backed,
-GPU-accelerated Python charting library that exports to PNG, SVG, HTML, and
-PDF.
+Figures live **in the Markdown as fenced blocks** (preferred) or as image
+files (fallback). The audit gate counts `fig`, `xy`, `svg`, and `mermaid`
+fences as figures, and image references.
 
-**Setup and API.** Install with `pip install xy` (or `uv add xy`). A chart
-is a container plus the marks inside it:
+**Primary form — a `fig` fence (static, theme-aware).** For a data plot that
+should read as a publication figure, use a self-contained matplotlib script
+in a ` ```fig ` block. The renderer (md2html) executes it under a themed
+context, inlines light+dark SVG into the report, and re-themes on toggle —
+no side files, palette-coherent with the page. The script receives `plt`,
+`C` (a palette dict: coral/teal/orange/purple/red/blue/green/ink/muted/line/bg),
+`clean(ax)`, and `save()`:
+
+````markdown
+```fig
+fig, ax = plt.subplots(figsize=(6.5, 3.6))
+ax.plot(x, y, color=C["coral"], lw=2.5)
+ax.set_title("Throughput vs. worker count")
+ax.set_xlabel("workers"); ax.set_ylabel("seq / s")
+clean(ax)
+save()
+```
+````
+
+Rules: self-contained (import what you use, inline or derive data); set a
+title and axis labels; `figsize` ≈ `(6.5, 3.6)`; end with `save()`.
+
+**Interactive form — an `xy` fence.** When the reader should pan/zoom, use
+[XY](https://github.com/reflex-dev/xy) (a Rust-backed Python charting
+library) in a ` ```xy ` block; bind the chart to a module-level variable
+named `chart`. It renders to standalone interactive HTML, theme-synced.
 
 ```python
 import xy
-
 chart = xy.line_chart(
     xy.line(x, y, color="#7c3aed", width=3),
-    xy.theme(background="#ffffff", grid_color="#e6e6e1", text_color="#0b0b0b"),
     title="Throughput vs. worker count",
 )
-chart.to_png("figures/fig-01-throughput.png")
 ```
 
-`xy.scatter_chart(xy.scatter(...))` covers scatter and density plots;
-`density=True` plus a `colormap` handles large point clouds. `xy.theme(...)`
-controls background, grid, axis, and text color. There is also a matplotlib
-compatibility layer — `import xy.pyplot as plt` — if a pyplot-style
-workflow is easier for a given figure.
+`xy.scatter_chart(...)` covers scatter/density; `xy.theme(...)` sets
+background/grid/text color. **XY is alpha** — check
+`https://reflex.dev/docs/xy/` before writing plotting code; if it lacks a
+chart type a figure needs, **say so in one line** and fall back to plain
+matplotlib (a `fig` fence) for that figure — never fake a chart type, never
+silently drop the figure.
 
-**XY is alpha.** It is moving fast, and not every chart type is implemented
-yet. Before writing plotting code, check the current docs at
-`https://reflex.dev/docs/xy/` and the repo's capability matrix. If XY does
-not yet support a chart type a figure needs (box plots, radar, treemap,
-candlestick, and 3D are on the roadmap but may not have landed), **say so
-in one line in the document** and fall back to plain matplotlib for that one
-figure — never fake a chart type, never silently drop the figure.
+**Diagrams — a `mermaid` fence.** For architecture, data flow, and state
+machines, a ` ```mermaid ` block (XY is a charting library, not a
+diagramming one). Every Mermaid block is syntax-checked at build time.
+
+**Fallback — image file.** When a figure can't be a fence (pre-rendered,
+binary, or from an external tool), save to `figures/` named
+`fig-01-<slug>.png` and reference it:
+`![Fig 1: <takeaway>](figures/fig-01-<slug>.png)`.
 
 **Figure density: err on the side of many.** A write-up that is easy to
 follow beats one that is lean. When in doubt, add the figure — a document
@@ -225,7 +250,7 @@ hold a structure in their head is not. Concretely:
 - **One figure per technical section is the floor, not the target.**
 - **Structure + result is the common shape.** A section about a component
   usually wants *both* a Mermaid structure/flow diagram (how the pieces
-  fit) *and* an XY plot (what it produces, measured). Include both.
+  fit) *and* a `fig` plot (what it produces, measured). Include both.
 - **A "Background" concept deserves a figure when it is the load-bearing
   idea** of the whole document.
 - **Results wants at least one plot** (a table alone is prose-shaped).
@@ -235,28 +260,23 @@ hold a structure in their head is not. Concretely:
 
 **Rules for every figure:**
 
-- Write and actually **run** the Python. Do not describe a figure you did
-  not produce. The audit gate verifies each referenced figure file exists
-  on disk; a dangling reference is a hard failure.
-- Save to `figures/` alongside the Markdown, named `fig-01-<slug>.png`,
-  numbered in document order.
-- Reference with relative paths and a real caption:
-  `![Fig 1: <what the reader should take away>](figures/fig-01-<slug>.png)`.
-- Define **one** `xy.theme(...)` up front (in the first plotting script) and
-  reuse it across every figure so the document is visually consistent. Do
-  not load an unrelated styling skill unless the user asks for one by name.
-- **Every figure must make a point.** Caption it with the *takeaway*, not
-  the contents: "Throughput plateaus above 8 workers" — not "Throughput vs.
-  worker count".
-- **Mix tools, add figures freely.** XY for results plots, before/after
-  comparisons, parameter sweeps, distributions, and large-N scatter; a
-  **Mermaid code block in the Markdown** for architecture, data flow, and
-  state machines (XY is a charting library, not a diagramming one). A
-  section may legitimately carry more than one figure — a structure
-  diagram *and* a plot.
-- Put the full plotting script(s) in **Appendix C** so the figures are
-  reproducible. **Pin the XY version** you used (`xy.__version__` or
-  `pip show xy`).
+- Write and actually **run** the code. Do not describe a figure you did not
+  produce — every `fig`/`xy` source must execute in a scratch dir (and a
+  `fig` fence must produce a valid figure). The audit gate verifies each
+  referenced *image file* exists on disk; a dangling image reference is a
+  hard failure.
+- For fenced figures, the source **is** the reproducible artifact — the
+  script runs inline at render time. For image-file figures, put the full
+  plotting script(s) in **Appendix C** so they are reproducible, and
+  **pin the XY version** you used (`xy.__version__` or `pip show xy`).
+- Caption with the *takeaway*, not the contents: "Throughput plateaus
+  above 8 workers" — not "Throughput vs. worker count". For a fence, put
+  the takeaway on the line directly after the closing fence.
+- **Mix tools, add figures freely.** `fig` for publication plots
+  (before/after comparisons, parameter sweeps, distributions); `xy` when
+  the reader should pan/zoom or inspect large-N data; a `mermaid` block for
+  architecture, data flow, and state machines. A section may legitimately
+  carry more than one figure — a structure diagram *and* a plot.
 
 ## Glossary (Appendix B)
 

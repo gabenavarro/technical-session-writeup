@@ -28,10 +28,10 @@ It exists to fix four failure modes of technical documentation:
 ## Appendix C: Reproducing the Figures
 ```
 
-Figures are generated with [XY](https://github.com/reflex-dev/xy) (Rust-backed,
-GPU-accelerated Python charting, exports PNG/SVG/HTML/PDF); architecture
-diagrams use Mermaid; unsupported chart types fall back to matplotlib with a
-one-line note.
+Figures live **as fenced blocks in the Markdown**: ` ```fig ` (matplotlib,
+static theme-aware SVG — the primary form), ` ```xy ` ([XY](https://github.com/reflex-dev/xy)
+interactive charts), ` ```mermaid ` (structure/flow diagrams); pre-rendered
+or binary images fall back to `figures/` + image references.
 
 ## Install (any machine, any harness)
 
@@ -40,8 +40,9 @@ git clone https://github.com/gabenavarro/technical-session-writeup
 ```
 
 The only runtime requirement for the audit gate is Python ≥ 3.8 (stdlib
-only). XY is needed only to produce figures: `pip install xy` (or
-`uv add xy`).
+only). To *produce* figures: `pip install xy` (for ` ```xy ` interactive
+charts) and/or matplotlib (for ` ```fig ` static figures) via
+`pip install matplotlib` (or `uv add xy matplotlib`).
 
 **OMP** — `skills.customDirectories: ["/path/to/technical-session-writeup"]`,
 or copy/symlink into `~/.agent/skills/` (user) / `.github/skills/` (project).
@@ -71,8 +72,9 @@ Findings are split into two tiers:
 
 - **hard** — defects that block delivery (exit 1): structure and order,
   per-section template (Why / Intuitively / Technically), **a technical
-  section with no figure**, figure files missing on disk,
-  correction-narration phrases in the main body, empty appendices.
+  section with no figure** (an image, a ` ```fig `/`xy`/`svg`/`mermaid `
+  fence, etc.), figure files missing on disk, correction-narration phrases
+  in the main body, empty appendices.
 - **advisory** — judgment-adjacent nudges (exit 0, printed for review):
   a section with exactly one figure (density favors a second), a short
   "Why this matters" opener, empty image alt text.
