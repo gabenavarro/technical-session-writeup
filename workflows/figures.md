@@ -3,6 +3,23 @@
 How to make figures for a write-up with XY (`reflex-dev/xy`), when to fall
 back to matplotlib, and when to use Mermaid instead.
 
+## Density: err on the side of many
+
+The policy is that **more figures is better than fewer.** A document that
+is easy to follow beats one that is lean. Concretely:
+
+- Every technical section must have **at least one** figure (the audit gate
+  enforces this). One is the floor, not the target.
+- The common shape is **two per section**: a Mermaid structure/flow
+  diagram (how the pieces fit) *and* an XY plot (what it produces,
+  measured). Include both when the section supports it.
+- When a section has exactly one figure, the audit gate will flag it as an
+  advisory — treat the nudge as a prompt to add a second angle.
+- The only real limit is quality: each figure must make at least a small
+  point (a takeaway caption). Do not invent a chart for its own sake, but
+  do not ration figures — a spare diagram is a trivial defect, a wall of
+  prose is not.
+
 ## Choose the right tool
 
 | Figure kind | Tool |

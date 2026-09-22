@@ -16,10 +16,11 @@ python3 <skill-dir>/scripts/audit_writeup.py --version    # pin the gate version
 Findings have two tiers:
 
 - **hard** (block delivery; exit 1): structure, section template,
-  missing figure files, correction-narration phrases in the main body,
-  empty appendices.
-- **advisory** (exit 0; review, do not block): a section with no figure,
-  a short "Why this matters" opener, empty image alt text.
+  **a technical section with no figure**, missing figure files,
+  correction-narration phrases in the main body, empty appendices.
+- **advisory** (exit 0; review, do not block): a section with exactly one
+  figure (density favors a second), a short "Why this matters" opener,
+  empty image alt text.
 
 Exit 0 with no hard findings is required. Advisories are prompts for the
 judgment checklist below, not defects. `--json` emits
@@ -30,10 +31,11 @@ The gate checks, mechanically:
 - **Structure:** all required `##` headings present, in order.
 - **Section template:** every numbered technical section has a "Why this
   matters" lead, an `**Intuitively.**` pass, and a `**Technically.**` pass,
-  in that order.
-- **Figures exist:** every `![...](...)` image reference resolves to a file
-  on disk (relative to the Markdown file). Dangling figure references are
-  hard failures — a figure you did not produce is a defect.
+- **Figures:** every `![...](...)` image reference resolves to a file on
+  disk (relative to the Markdown file). Dangling figure references are
+  hard failures — a figure you did not produce is a defect. Additionally,
+  **every technical section must contain at least one figure** (an image
+  reference or a Mermaid block); a section with none is a hard failure.
 - **Corrections rule:** scans the main body (everything before Appendix A)
   for narration-of-correction phrases. Each hit is a finding you must fix
   by deleting the phrase or relocating the content to Appendix A.

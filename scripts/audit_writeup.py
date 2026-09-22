@@ -11,15 +11,17 @@ Hard checks (mechanically verifiable subset of the skill's self-audit):
   1. Structure   - required H2 sections present, in order; exactly one H1.
   2. Template    - every technical section has Why-this-matters,
                    Intuitively, Technically passes, in order.
-  3. Figures     - every referenced image file exists on disk.
+  3. Figures     - every technical section has at least one figure
+                   (image reference or Mermaid block); every referenced
+                   image file exists on disk.
   4. Corrections - no narration-of-correction phrases in the main body
                    (everything before Appendix A); code fences excluded.
   5. Appendices  - A has entries or "None."; B has entries or "None.";
                    C has a code fence when figures exist.
 
 Advisories (warn, do not block):
-  - a technical section has no Figure (the skill permits omission, but it
-    is worth a second look)
+  - a technical section has exactly one figure (density favors a second,
+    e.g. structure + result)
   - a "Why this matters" opener shorter than 25 characters
   - an image with empty alt text
 
@@ -42,7 +44,7 @@ import re
 import sys
 from pathlib import Path
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # --- required H2 sections, in document order -------------------------------
 REQUIRED_SECTIONS = [
@@ -107,20 +109,25 @@ IMG = re.compile(r"!\[[^\]]*\]\(([^)\s]+)(?:\s+[^\)]*)?\)")
 IMG_ALT = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)")
 GLOSSARY_ENTRY = re.compile(r"^\s*(?:[-*]\s+)?\*\*[^*]+\.\*\*", re.MULTILINE)
 APPENDIX_A_ENTRY = re.compile(r"^###\s+A\.\d+", re.MULTILINE)
-
-
 def strip_code_fences(lines):
     """Return lines with code-fence contents blanked out.
 
-    Fence delimiters themselves are blanked too; they are neutral for
-    heading detection and phrase scanning.
+    The opening fence is replaced by a `[fence:<lang>]` placeholder so the
+    fence *language* (e.g. `mermaid`) survives masking for checks that look
+    for it; the fence body and closing fence are blanked. Fence delimiters are
+    neutral for heading detection and phrase scanning.
     """
     masked = []
     in_fence = False
     for ln in lines:
-        if CODE_FENCE.match(ln.strip()):
+        s = ln.strip()
+        if CODE_FENCE.match(s):
+            if in_fence:
+                masked.append("")
+            else:
+                lang = s.lstrip("`~").strip()
+                masked.append(f"[fence:{lang}]" if lang else "[fence]")
             in_fence = not in_fence
-            masked.append("")
             continue
         masked.append("" if in_fence else ln)
     return masked
@@ -195,13 +202,21 @@ def check(md_path: Path):
             hard.append((start + 1, f"section '{title}' missing **Technically.** pass"))
         if why and intu and techp and not (why.start() < intu.start() < techp.start()):
             hard.append((start + 1, f"section '{title}' parts out of order (Why -> Intuitively -> Technically)"))
-        # Advisories: short opener, missing figure.
-        if why and intu and why.start() < intu.start():
-            opener = body[why.end():intu.start()].strip()
-            if len(opener) < 25:
-                adv.append((start + 1, f"section '{title}' 'Why this matters' opener is short (< 25 chars)"))
-        if "!" not in body and "mermaid" not in body.lower():
-            adv.append((start + 1, f"section '{title}' has no Figure (permitted - verify it adds nothing)"))
+        # Hard: every technical section must carry at least one figure
+        # (an image reference or a Mermaid block). The skill's policy is
+        # that more figures is better than fewer, so a section with zero is
+        # a defect, not a permitted omission.
+        figs = sum(1 for _ in IMG.finditer(body))
+        if figs == 0 and "mermaid" not in body.lower():
+            hard.append(
+                (start + 1, f"section '{title}' has no figure (add a diagram or plot)")
+            )
+        # Advisory: a section with exactly one figure could usually carry a
+        # second (structure + result); nudge toward density.
+        elif figs == 1 and "mermaid" not in body.lower():
+            adv.append(
+                (start + 1, f"section '{title}' has one figure - consider a second (e.g. structure + result)")
+            )
 
     # 4. Figures exist on disk (references inside code fences are literals, skipped).
     for i, ln in enumerate(masked):

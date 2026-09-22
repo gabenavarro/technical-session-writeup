@@ -70,12 +70,12 @@ python3 scripts/audit_writeup.py --version              # gate version (pin it)
 Findings are split into two tiers:
 
 - **hard** — defects that block delivery (exit 1): structure and order,
-  per-section template (Why / Intuitively / Technically), figure files
-  missing on disk, correction-narration phrases in the main body, empty
-  appendices.
+  per-section template (Why / Intuitively / Technically), **a technical
+  section with no figure**, figure files missing on disk,
+  correction-narration phrases in the main body, empty appendices.
 - **advisory** — judgment-adjacent nudges (exit 0, printed for review):
-  a section with no figure, a short "Why this matters" opener, empty image
-  alt text.
+  a section with exactly one figure (density favors a second), a short
+  "Why this matters" opener, empty image alt text.
 
 `--json` emits `{"file", "clean", "hard": [[line, msg], ...],
 "advisories": [[line, msg], ...]}` for harnesses to consume programmatically.

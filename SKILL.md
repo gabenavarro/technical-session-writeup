@@ -95,9 +95,13 @@ Each numbered `## <Section N>` must contain these parts, **in this order**:
    expert: equations, complexity bounds, parameter values, library versions,
    algorithm names, citations. Do **not** dumb this down — the intuitive
    pass already did that job.
-4. **Figure** — a diagram or plot, **where it genuinely clarifies**. Not
-   decoration. If a figure would not teach the reader something the prose
-   cannot, omit it and say so is fine; a forced figure is a defect.
+4. **Figure** — a diagram or plot. **Every technical section must have at
+   least one.** More is better: when a concept can be shown from two
+   angles (a structure diagram *and* a result plot, an architecture view
+   *and* a before/after), include both. The bar is low — a figure that
+   makes the section easier to follow earns its place. Do not ration
+   figures; a document with too many is a far smaller defect than one
+   that reads as a wall of prose.
 
 **The intuitive and technical passes must describe the *same thing*.** A
 common failure is the analogy drifting into a different concept than the one
@@ -213,6 +217,22 @@ candlestick, and 3D are on the roadmap but may not have landed), **say so
 in one line in the document** and fall back to plain matplotlib for that one
 figure — never fake a chart type, never silently drop the figure.
 
+**Figure density: err on the side of many.** A write-up that is easy to
+follow beats one that is lean. When in doubt, add the figure — a document
+with a spare diagram is a trivial defect; one that forces the reader to
+hold a structure in their head is not. Concretely:
+
+- **One figure per technical section is the floor, not the target.**
+- **Structure + result is the common shape.** A section about a component
+  usually wants *both* a Mermaid structure/flow diagram (how the pieces
+  fit) *and* an XY plot (what it produces, measured). Include both.
+- **A "Background" concept deserves a figure when it is the load-bearing
+  idea** of the whole document.
+- **Results wants at least one plot** (a table alone is prose-shaped).
+- Before finalizing, walk the document and ask of each section: is there a
+  place where a diagram would let the reader *see* something the prose
+  makes them reconstruct? If yes, make it.
+
 **Rules for every figure:**
 
 - Write and actually **run** the Python. Do not describe a figure you did
@@ -228,10 +248,12 @@ figure — never fake a chart type, never silently drop the figure.
 - **Every figure must make a point.** Caption it with the *takeaway*, not
   the contents: "Throughput plateaus above 8 workers" — not "Throughput vs.
   worker count".
-- Good candidates: results plots, before/after comparisons, parameter
-  sweeps, distributions, large-N scatter. For architecture, data flow, and
-  state machines, use a **Mermaid code block in the Markdown** instead — XY
-  is a charting library, not a diagramming one.
+- **Mix tools, add figures freely.** XY for results plots, before/after
+  comparisons, parameter sweeps, distributions, and large-N scatter; a
+  **Mermaid code block in the Markdown** for architecture, data flow, and
+  state machines (XY is a charting library, not a diagramming one). A
+  section may legitimately carry more than one figure — a structure
+  diagram *and* a plot.
 - Put the full plotting script(s) in **Appendix C** so the figures are
   reproducible. **Pin the XY version** you used (`xy.__version__` or
   `pip show xy`).
@@ -266,9 +288,13 @@ python3 <skill-dir>/scripts/audit_writeup.py <writeup.md>
 - [ ] No term appears before its definition.
 - [ ] No corrections, debugging narration, or dead ends appear outside
       Appendix A. (Gate-enforced.)
+- [ ] Every technical section has at least one figure (diagram or plot).
+      (Gate-enforced.)
 - [ ] Every figure was actually generated and the file exists on disk.
       (Gate-enforced.)
 - [ ] Every figure caption states a takeaway, not a content description.
+- [ ] Where a section could carry a second figure (structure *and* result),
+      it does — density favors more.
 - [ ] Every defined term appears in the glossary.
 - [ ] A domain expert would find the technical passes rigorous enough to
       act on.

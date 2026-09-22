@@ -4,9 +4,9 @@ Fill-in-the-blanks skeleton. Copy it, fill every `<...>` slot, delete slots
 that do not apply. Section order is fixed; the numbered technical sections
 scale to the session.
 
-The bold passes (`Intuitively.`, `Technically.`) are required leads. A
-section may omit the Figure (only if no figure genuinely clarifies); it may
-not omit the other three parts.
+A section **must** carry at least one Figure (a diagram or plot) — the
+audit gate enforces this — and may carry more than one (density favors a
+second). It may not omit the other three parts.
 
 ````markdown
 # <Project / Session Title>
